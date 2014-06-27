@@ -10,14 +10,16 @@
 // http://wp.josh.com/2014/06/16/using-google-spreadsheets-for-logging-sensor-data/
 //
 // In the meantime, for playing you can use the URL below that logs to a sample spreadsheet here...
-// https://docs.google.com/spreadsheets/d/1y_sZ31-mjFGc8TGJrmOFs4Irp_4JAve08cBTs62lmgA/edit?usp=sharing
+// https://docs.google.com/spreadsheets/d/1P0JM7CJU3snBUgjXYzidC7_h2MzJNZuPMAMUblVY28s/edit?usp=sharing
 // Use this only for testing becuase I periodically clear it out (getting your own private sheet is FREE!)
 
-#define GOOGLE_URL "https://script.google.com/macros/s/AKfycbyYphXhIhNK1-t9vYGO1dgJ96ZXoZkP4C-PdAT3YieCxNjPEyF0/exec"
+#define GOOGLE_URL "https://script.google.com/macros/s/AKfycbylmWrBhAs__0V_sqUmk_N_0b23n8QHWG0menWSBuyEobR1-C8/exec"
 
 // UnComment out this line to turn on debug messages to the USB port that are visible 
 // using Serial Monitor on the Arduino IDE. Do not leave DEBUG defined for a board in production
-// becuase the print statements will hang if there is no computer attached.
+// becuase the print statements will hang if there is no computer attached. Also, printing to the serial
+// port on the Yun only seems to work after you download from the IDE. If you try to do it on power-up
+// the Yun seems to not create the USB Serial port on the host. Argh.
 
 //#define DEBUG 
 
@@ -25,8 +27,12 @@
 // Comment line out for no tone (or just dont connect a speaker the the pin :))
 
 #define TONE_PIN 10
-
+a
 // We blink the LED connected here to indicate that we are running
+//  1Hrz = waiting for dead air on Linino before starting up
+// 10Hrz = waiting for next sample time
+// Off   = Sampling sensors
+// On    = Making HTTP request
 
 #define LED_PIN 13
 
@@ -145,12 +151,16 @@ void setupLinino() {
 
   // Wait for at least 1 second of dead air to make sure that Linino boot process is complete,
   // otherwise we might accedentally answer the "press any key to start uboot" prompt.
-
-  while ( Serial1.available() ) {
+  
+  do {
     while (Serial1.available()) Serial1.read();
-    db(F("There was data, so waiting 1 second before trying again..."));
-    delay(1000);
-  };
+    db(F("Waiting 1 second of dead air from Linino link before continuing..."));
+    digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+    delay(500);                    // wait for 1/2 a second
+    digitalWrite(LED_PIN, LOW);    // turn the LED off by making the voltage LOW
+    delay(500);                    // wait for 1/2 a second    
+    
+  } while (Serial1.available());
   
 
   Serial1.print( F("\xff\0\0\x05XXXXX\x0d\xaf") );   // Bridge shutdown command incase bridge is running
@@ -182,14 +192,10 @@ void setup(void)
   #endif
       
   // Blink some lights to show we are alive... 
-  digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);               // wait for a second
+  pinMode( 13 , OUTPUT );
     
   setupLinino();
  
-  // If the LED stays on, theat mean we got stuck inside Bridge.begin()
-  
-  digitalWrite(13, LOW);    // turn the LED off by making the voltage LOW
    
   db( F("Multi-DS1820 Temp Sensor Logging to Google Spreadsheet" ));
   
@@ -295,7 +301,9 @@ void loop(void)
       
   db(F("Sending command to Linino:"));
   dbl(commandLineBuffer);
-    
+  
+  digitalWrite(LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+      
   blindSendToLinino( commandLineBuffer );
   
   dbl(F("Sent."));
@@ -324,6 +332,10 @@ void loop(void)
     
  
   dbl(  F("<------RESPONSE" ));  
+  
+  
+  digitalWrite(LED_PIN, LOW);   // turn the LED off 
+  
       
 //  */
   
